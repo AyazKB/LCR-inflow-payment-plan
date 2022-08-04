@@ -1,0 +1,75 @@
+SELECT /*+parallel(10) full(T1)*/
+
+        T1.CONTRACT_REF_NO,
+
+        T2.PRODUCT_code,
+
+       T3.PRODUCT_CLASS,
+       
+       CASE WHEN T5.PRINCIPAL_OVERDUE_DAYS<30 AND T5.INTEREST_OVERDUE_DAYS<30 THEN '<30'
+            WHEN T5.PRINCIPAL_OVERDUE_DAYS<90 AND T5.INTEREST_OVERDUE_DAYS<90 THEN '30-90'
+            ELSE '>=90' END OVERDUE_DAYS,
+
+       SUM(CASE WHEN T1.currency = 'AZN' THEN T1.AMOUNT-t1.amount_settled ELSE 0 END) AMOUNT_AZN ,
+
+       SUM(CASE WHEN T1.currency != 'AZN' THEN T1.AMOUNT-t1.amount_settled ELSE 0 END) AMOUNT_USD,
+
+       SUM(CASE WHEN T1.currency != 'AZN' THEN (T1.AMOUNT-t1.amount_settled)*1.7 ELSE 0 END) AMOUNT_USD_TO_AZN,
+
+       SUM(nvl((T1.AMOUNT-t1.amount_settled)*case when T1.currency = 'AZN' then 1 else 1.7 end,0)) AS AMOUNT_TOTAL
+
+
+
+
+
+  FROM DWH.D_PAYMENT_PLAN T1
+
+       INNER JOIN dwh.d_contract_credit T2 ON T1.CONTRACT_REF_NO = T2.Contract_Ref_No and t1.source_id = t2.source_id
+
+
+
+       INNER JOIN dwh.d_product T3 ON T2.PRODUCT_code = T3.code and t2.source_id =t3.source_id
+
+
+
+      -- left JOIN DWH.D_CURRENCY_RATE T4 ON T1.PAYMENT_DATE=T4.BANK_DATE AND T4.CURRENCY_ID=T1.CURRENCY_ID
+
+
+
+       inner JOIN FRONT.DM_CREDIT_PORTFOLIO T5 ON T1.CONTRACT_REF_NO=T5.CONTRACT_REF_NO
+
+                                                  AND T1.SOURCE_ID=T5.SOURCE_ID
+
+                                                  AND T5.BANK_DATE=DATE '2022-07-29' -----KECEN AYIN SON IS GUNU
+
+
+
+WHERE  T1.amount_type = 1   -- 'PRINCIPAL'
+
+       AND nvl(T2.IS_WRITTEN_OFF,0) !=1
+
+       AND T1.payment_date BETWEEN date'2022-08-01' AND date'2022-08-31'
+
+       and t1.source_id =1
+
+       AND T2.SOURCE_ID =1
+
+       AND T3.SOURCE_ID =1
+
+/*       AND T5.PRINCIPAL_OVERDUE_DAYS<30 ----------------------GECIKME_GUNLERI
+
+       AND T5.INTEREST_OVERDUE_DAYS<30*/------------------------------GECIKME_GUNLERI
+
+       AND T1.AMOUNT>t1.amount_settled
+
+
+
+GROUP BY T2.PRODUCT_code,
+
+         T3.PRODUCT_CLASS,
+
+         T1.CONTRACT_REF_NO,
+         CASE WHEN T5.PRINCIPAL_OVERDUE_DAYS<30 AND T5.INTEREST_OVERDUE_DAYS<30 THEN '<30'
+            WHEN T5.PRINCIPAL_OVERDUE_DAYS<90 AND T5.INTEREST_OVERDUE_DAYS<90 THEN '30-90'
+            ELSE '>=90' END
+         
